@@ -25,6 +25,9 @@ import {
 const HISTORY_DELTAS_PREFIX = '/sync-freedom/history/deltas';
 const PRUNE_OLDER_THAN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+// Map of url -> timestamp (ms) when it was programmatically added
+const programmaticallyAddedUrls = new Map<string, number>();
+
 // ─── Types ────────────────────────────────────────────────────────────
 
 export interface HistoryDelta {
@@ -48,11 +51,19 @@ export function registerHistoryListener(): void {
 
   chrome.history.onVisited.addListener(async (item) => {
     if (!item.url) return;
+
+    // Skip programmatically added visits to prevent infinite loop
+    const addedTime = programmaticallyAddedUrls.get(item.url);
+    if (addedTime && Date.now() - addedTime < 10000) {
+      programmaticallyAddedUrls.delete(item.url);
+      return;
+    }
+
     try {
       await enqueueVisit({
         url: item.url,
         title: item.title ?? item.url,
-        visitTime: Date.now(),
+        visitTime: item.lastVisitTime ?? Date.now(),
       });
     } catch (err) {
       console.warn('[History] Failed to enqueue visit:', err);
@@ -158,9 +169,12 @@ async function applyDelta(delta: HistoryDelta): Promise<number> {
 
   for (const visit of delta.visits) {
     try {
+      // Register this URL in our ignore list before adding it
+      programmaticallyAddedUrls.set(visit.url, Date.now());
       await chrome.history.addUrl({ url: visit.url });
       applied++;
     } catch (err) {
+      programmaticallyAddedUrls.delete(visit.url);
       // Some URLs may be rejected (e.g., non-http) — ignore silently
     }
   }

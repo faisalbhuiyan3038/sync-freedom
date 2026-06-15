@@ -56,9 +56,9 @@
 | **Tab sync — open remote tab** | Click a remote tab → opens locally | ✅ Completed | `chrome.tabs.create()` |
 | **Tab state history (last N)** | Keep last 3-4 snapshots of open tabs per device | ✅ Completed | Snapshots stored alongside current state. User can browse "what was open at 2pm" |
 | **History sync — capture events** | Listen to `chrome.history.onVisited`, queue locally | ✅ Completed | Scaffolded IndexedDB queue |
-| **History sync — push deltas** | Bundle queued visits, encrypt, upload as delta files | 📋 Planned | Phase 2 |
-| **History sync — pull & merge** | Fetch remote deltas, union visit timestamps, apply | 📋 Planned | Phase 2 |
-| **History sync — deduplication** | Union all visit timestamps across devices | 📋 Planned | Phase 2 |
+| **History sync — push deltas** | Bundle queued visits, encrypt, upload as delta files | ✅ Completed | Bundled into encrypted JSON deltas periodically |
+| **History sync — pull & merge** | Fetch remote deltas, union visit timestamps, apply | ✅ Completed | Merges remote visits to native browser history, cursor-tracked |
+| **History sync — deduplication** | Union all visit timestamps across devices | ✅ Completed | Unified by unique visit times and ignore lists to prevent loops |
 | **Encryption layer** | AES-256-GCM encrypt/decrypt all synced data | ✅ Completed | PBKDF2 from user passphrase + shared manifest salt |
 | **Device registration** | Unique device ID generation + device name | ✅ Completed | Stored in `chrome.storage.local` |
 | **Storage adapter interface** | Pluggable `StorageAdapter` with standard methods | ✅ Completed | See initial-plan.md §IV |
@@ -159,12 +159,12 @@
 - [x] Popup UI — view/open remote tabs + tab history
 - [x] Setup wizard
 
-### Phase 2: History Sync (2-3 weeks)
-- [ ] `chrome.history.onVisited` event capture → IndexedDB queue
-- [ ] Delta generation & encryption & push
-- [ ] Delta fetch & merge (union of visit timestamps)
-- [ ] Apply remote history via `chrome.history.addUrl`
-- [ ] Snapshot generation (weekly)
+### Phase 2: History Sync (Completed)
+- [x] `chrome.history.onVisited` event capture → IndexedDB queue
+- [x] Delta generation & encryption & push
+- [x] Delta fetch & merge (union of visit timestamps)
+- [x] Apply remote history via `chrome.history.addUrl`
+- [x] Ignore map and loop prevention timing logic
 
 ### Phase 3: More Backends + Polish (2 weeks)
 - [ ] Google Drive adapter
@@ -184,3 +184,5 @@
 | 2026-06-15 | Added "last N tab states" feature | Keep last 3-4 tab snapshots per device (not just current), for recovering previously-open tabs |
 | 2026-06-15 | Built API probe extension | Test extension probing chrome.tabs, chrome.history, chrome.alarms, chrome.storage, chrome.runtime, Web Crypto, IndexedDB, Fetch, Service Worker |
 | 2026-06-15 | Created PROJECT_TRACKER.md | Living document for all features, decisions, and compatibility tracking |
+| 2026-06-15 | Completed Phase 1 + Bug Fixes | WebDAV path parsing fixed for Koofr absolute URLs and folders. Manifest-based shared encryption salt implemented. |
+| 2026-06-15 | Completed Phase 2 History Sync | History Sync activated, settings toggle added, ignore timing lists implemented to prevent infinite programmatic visit loops. |

@@ -6,14 +6,14 @@
  */
 
 const DB_NAME = 'sync_freedom';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface HistoryQueueItem {
   id?: number;       // auto-incremented
   url: string;
   title: string;
   visitTime: number; // Unix ms
-  synced: boolean;
+  synced: number;    // 0 = unsynced, 1 = synced
 }
 
 export interface SyncCursor {
@@ -35,20 +35,24 @@ async function getDB(): Promise<IDBDatabase> {
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
 
-      // History queue store
-      if (!db.objectStoreNames.contains('history_queue')) {
-        const store = db.createObjectStore('history_queue', {
-          keyPath: 'id',
-          autoIncrement: true,
-        });
-        store.createIndex('by_synced', 'synced', { unique: false });
-        store.createIndex('by_visitTime', 'visitTime', { unique: false });
+      // Drop old stores if upgrading
+      if (db.objectStoreNames.contains('history_queue')) {
+        db.deleteObjectStore('history_queue');
+      }
+      if (db.objectStoreNames.contains('sync_cursors')) {
+        db.deleteObjectStore('sync_cursors');
       }
 
-      // Sync cursors store (one entry per remote device)
-      if (!db.objectStoreNames.contains('sync_cursors')) {
-        db.createObjectStore('sync_cursors', { keyPath: 'deviceId' });
-      }
+      // Recreate history queue store
+      const store = db.createObjectStore('history_queue', {
+        keyPath: 'id',
+        autoIncrement: true,
+      });
+      store.createIndex('by_synced', 'synced', { unique: false });
+      store.createIndex('by_visitTime', 'visitTime', { unique: false });
+
+      // Recreate sync cursors store (one entry per remote device)
+      db.createObjectStore('sync_cursors', { keyPath: 'deviceId' });
     };
 
     req.onsuccess = (e) => {
@@ -64,7 +68,7 @@ export async function enqueueVisit(item: Omit<HistoryQueueItem, 'id' | 'synced'>
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('history_queue', 'readwrite');
-    tx.objectStore('history_queue').add({ ...item, synced: false });
+    tx.objectStore('history_queue').add({ ...item, synced: 0 });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -75,7 +79,7 @@ export async function getUnsynced(): Promise<HistoryQueueItem[]> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('history_queue', 'readonly');
     const index = tx.objectStore('history_queue').index('by_synced');
-    const req = index.getAll(IDBKeyRange.only(false));
+    const req = index.getAll(IDBKeyRange.only(0));
     req.onsuccess = () => resolve(req.result as HistoryQueueItem[]);
     req.onerror = () => reject(req.error);
   });
@@ -93,7 +97,7 @@ export async function markSynced(ids: number[]): Promise<void> {
       req.onsuccess = () => {
         const item = req.result as HistoryQueueItem;
         if (item) {
-          item.synced = true;
+          item.synced = 1;
           store.put(item);
         }
         if (--pending === 0) { /* wait for oncomplete */ }
@@ -116,7 +120,7 @@ export async function pruneOldSynced(olderThanMs: number): Promise<void> {
       const cursor = req.result;
       if (cursor) {
         const item = cursor.value as HistoryQueueItem;
-        if (item.synced) cursor.delete();
+        if (item.synced === 1) cursor.delete();
         cursor.continue();
       }
     };

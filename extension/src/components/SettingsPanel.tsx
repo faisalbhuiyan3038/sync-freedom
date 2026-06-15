@@ -14,6 +14,7 @@ export function SettingsPanel({ settings, onSaved }: SettingsPanelProps) {
   );
   const [snapCount, setSnapCount] = useState(settings.tabSnapshotCount);
   const [intervalMin, setIntervalMin] = useState(settings.syncIntervalMinutes);
+  const [historyEnabled, setHistoryEnabled] = useState(settings.historySyncEnabled);
   const [deviceNameVal, setDeviceNameVal] = useState('');
   const [connResult, setConnResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -71,6 +72,7 @@ export function SettingsPanel({ settings, onSaved }: SettingsPanelProps) {
       await saveSettings({
         credentials: creds,
         tabSnapshotCount: snapCount,
+        historySyncEnabled: historyEnabled,
         syncIntervalMinutes: Math.max(1, intervalMin),
       });
       if (deviceNameVal.trim()) {
@@ -194,6 +196,22 @@ export function SettingsPanel({ settings, onSaved }: SettingsPanelProps) {
               <option value={30}>Every 30 min</option>
               <option value={60}>Every hour</option>
             </select>
+          </div>
+        </div>
+
+        <div className="form-group" style={{ marginTop: '14px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', color: 'var(--text-primary)' }}>
+            <input
+              id="settings-history-sync"
+              type="checkbox"
+              checked={historyEnabled}
+              onChange={e => setHistoryEnabled(e.target.checked)}
+              style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+            />
+            <span>Enable History Sync</span>
+          </label>
+          <div className="form-hint" style={{ marginLeft: '23px', marginTop: '4px' }}>
+            Syncs browser history visits across your devices. Visits will merge into your browser's native history page.
           </div>
         </div>
       </div>
