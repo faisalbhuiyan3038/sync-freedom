@@ -28,6 +28,8 @@ export interface DeviceTabList {
   deviceName: string;
   lastUpdated: number; // Unix ms
   tabs: TabEntry[];
+  decryptionFailed?: boolean;
+  filePath?: string;
 }
 
 /** A historical snapshot of this device's tabs */
@@ -103,17 +105,23 @@ export async function pushTabsIfChanged(
 
 // ─── Pull ─────────────────────────────────────────────────────────────
 
+export interface PullRemoteTabsResult {
+  devices: DeviceTabList[];
+  errors: string[];
+}
+
 /**
  * Pull all other devices' tab lists from storage and cache them locally.
- * Returns the full list including all remote devices.
+ * Returns the full list including all remote devices and a list of paths that failed to load/decrypt.
  */
 export async function pullRemoteTabs(
   adapter: StorageAdapter,
   encryptionKey: CryptoKey,
   myDeviceId: string,
-): Promise<DeviceTabList[]> {
+): Promise<PullRemoteTabsResult> {
   const files = await adapter.listFiles(TABS_PREFIX + '/');
   const remoteDeviceLists: DeviceTabList[] = [];
+  const errors: string[] = [];
 
   await Promise.allSettled(
     files
@@ -128,6 +136,20 @@ export async function pullRemoteTabs(
           remoteDeviceLists.push(deviceList);
         } catch (err) {
           console.warn(`[Tabs] Failed to pull/decrypt ${filePath}:`, err);
+          errors.push(filePath);
+          
+          // Extract device ID from file path
+          const match = filePath.match(/\/tabs\/(.+)\.json\.enc$/);
+          const deviceId = match ? match[1] : filePath;
+          
+          remoteDeviceLists.push({
+            deviceId,
+            deviceName: `Unknown Device (${deviceId.slice(0, 8)})`,
+            lastUpdated: 0,
+            tabs: [],
+            decryptionFailed: true,
+            filePath,
+          });
         }
       }),
   );
@@ -138,7 +160,7 @@ export async function pullRemoteTabs(
   // Cache for popup
   await chrome.storage.local.set({ [REMOTE_CACHE_KEY]: remoteDeviceLists });
 
-  return remoteDeviceLists;
+  return { devices: remoteDeviceLists, errors };
 }
 
 /**

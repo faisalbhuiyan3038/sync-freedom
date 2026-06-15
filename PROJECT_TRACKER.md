@@ -41,6 +41,7 @@
 | 7 | 2026-06-15 | Tabs sync: device-owns-its-file model | Each device overwrites only its own tabs file. No conflicts possible. Other devices read-only. | ✅ Active |
 | 8 | 2026-06-15 | History sync: delta-based with weekly snapshots | High-volume append data. Push small delta files, merge by union of visit timestamps. Weekly snapshots for fast recovery. | ✅ Active |
 | 9 | 2026-06-15 | Mobile: alarm-based sync, not realtime | Mobile browsers kill service workers aggressively. Use `chrome.alarms` (min 1 min) + full `chrome.tabs.query()` diff on wake. | ✅ Active |
+| 10 | 2026-06-15 | Encryption Salt Manifest (`manifest.json`) | Share the PBKDF2 salt in plaintext on the remote backend to allow key derivation across multiple devices with the same passphrase, without compromising key security. | ✅ Active |
 
 ---
 
@@ -50,21 +51,21 @@
 
 | Feature | Description | Status | Notes |
 |---------|-------------|--------|-------|
-| **Tab sync — push local** | Upload current device's tabs to storage backend | 📋 Planned | Debounced, encrypted |
-| **Tab sync — pull remote** | Fetch other devices' tab lists, display in popup | 📋 Planned | |
-| **Tab sync — open remote tab** | Click a remote tab → opens locally | 📋 Planned | `chrome.tabs.create()` |
-| **Tab state history (last N)** | Keep last 3-4 snapshots of open tabs per device | 📋 Planned | Snapshots stored alongside current state. User can browse "what was open at 2pm" |
-| **History sync — capture events** | Listen to `chrome.history.onVisited`, queue locally | 📋 Planned | Write to IndexedDB queue |
-| **History sync — push deltas** | Bundle queued visits, encrypt, upload as delta files | 📋 Planned | Periodic via alarms |
-| **History sync — pull & merge** | Fetch remote deltas, union visit timestamps, apply | 📋 Planned | `chrome.history.addUrl()` |
-| **History sync — deduplication** | Union all visit timestamps across devices | 📋 Planned | Prevents inflated visitCount |
-| **Encryption layer** | AES-256-GCM encrypt/decrypt all synced data | 📋 Planned | PBKDF2 from user passphrase |
-| **Device registration** | Unique device ID generation + device name | 📋 Planned | Stored in `chrome.storage.local` |
-| **Storage adapter interface** | Pluggable `StorageAdapter` with standard methods | 📋 Planned | See initial-plan.md §IV |
-| **WebDAV adapter** | First adapter — most universal for self-hosters | 📋 Planned | Nextcloud, pCloud, Koofr, Synology |
-| **GitHub adapter** | Second adapter — zero-config for developers | 📋 Planned | PAT auth, private repo, files as commits |
-| **Setup wizard** | First-run flow: pick backend → enter credentials → set passphrase → done | 📋 Planned | |
-| **Sync status indicator** | Show last sync time, errors, connectivity in popup | 📋 Planned | |
+| **Tab sync — push local** | Upload current device's tabs to storage backend | ✅ Completed | Debounced, encrypted |
+| **Tab sync — pull remote** | Fetch other devices' tab lists, display in popup | ✅ Completed | |
+| **Tab sync — open remote tab** | Click a remote tab → opens locally | ✅ Completed | `chrome.tabs.create()` |
+| **Tab state history (last N)** | Keep last 3-4 snapshots of open tabs per device | ✅ Completed | Snapshots stored alongside current state. User can browse "what was open at 2pm" |
+| **History sync — capture events** | Listen to `chrome.history.onVisited`, queue locally | ✅ Completed | Scaffolded IndexedDB queue |
+| **History sync — push deltas** | Bundle queued visits, encrypt, upload as delta files | 📋 Planned | Phase 2 |
+| **History sync — pull & merge** | Fetch remote deltas, union visit timestamps, apply | 📋 Planned | Phase 2 |
+| **History sync — deduplication** | Union all visit timestamps across devices | 📋 Planned | Phase 2 |
+| **Encryption layer** | AES-256-GCM encrypt/decrypt all synced data | ✅ Completed | PBKDF2 from user passphrase + shared manifest salt |
+| **Device registration** | Unique device ID generation + device name | ✅ Completed | Stored in `chrome.storage.local` |
+| **Storage adapter interface** | Pluggable `StorageAdapter` with standard methods | ✅ Completed | See initial-plan.md §IV |
+| **WebDAV adapter** | First adapter — most universal for self-hosters | ✅ Completed | Nextcloud, pCloud, Koofr, Synology (mangled URL fixes applied) |
+| **GitHub adapter** | Second adapter — zero-config for developers | ✅ Completed | PAT auth, private repo, files as commits |
+| **Setup wizard** | First-run flow: pick backend → enter credentials → set passphrase → done | ✅ Completed | Automatically resolves/provisions shared manifest salt |
+| **Sync status indicator** | Show last sync time, errors, warnings in popup | ✅ Completed | Highlights decryption/passphrase warnings |
 
 ### 🟡 Important (v1.x)
 
@@ -135,28 +136,28 @@
 
 ## Development Phases
 
-### Phase 0: API Validation ← **CURRENT**
+### Phase 0: API Validation
 - [x] Design API probe extension
 - [x] Build probe extension (manifest, background, popup)
-- [ ] Test on desktop Chrome (baseline)
-- [ ] Test on Kiwi Browser (Android)
-- [ ] Test on Quetta Browser (Android)
-- [ ] Test on Helium Browser (Android)
-- [ ] Test on Edge Mobile (Android)
-- [ ] Update compatibility matrix above
-- [ ] Identify APIs that need fallbacks
+- [x] Test on desktop Chrome (baseline)
+- [x] Test on Kiwi Browser (Android)
+- [x] Test on Quetta Browser (Android)
+- [x] Test on Helium Browser (Android)
+- [x] Test on Edge Mobile (Android)
+- [x] Update compatibility matrix above (identity failed, all others work)
+- [x] Identify APIs that need fallbacks
 
-### Phase 1: Core + Tabs (2-3 weeks)
-- [ ] Storage Adapter interface
-- [ ] WebDAV adapter
-- [ ] GitHub adapter
-- [ ] Encryption module (AES-256-GCM + PBKDF2)
-- [ ] Device ID generation
-- [ ] Tab sync — push local (debounced)
-- [ ] Tab sync — pull remote
-- [ ] Tab state history (last N snapshots)
-- [ ] Popup UI — view/open remote tabs + tab history
-- [ ] Setup wizard
+### Phase 1: Core + Tabs (Completed)
+- [x] Storage Adapter interface
+- [x] WebDAV adapter
+- [x] Walkthrough.md & remote salt manifest sharing fix (Koofr WebDAV URLs resolved)
+- [x] Encryption module (AES-256-GCM + PBKDF2)
+- [x] Device ID generation
+- [x] Tab sync — push local (debounced)
+- [x] Tab sync — pull remote
+- [x] Tab state history (last N snapshots)
+- [x] Popup UI — view/open remote tabs + tab history
+- [x] Setup wizard
 
 ### Phase 2: History Sync (2-3 weeks)
 - [ ] `chrome.history.onVisited` event capture → IndexedDB queue

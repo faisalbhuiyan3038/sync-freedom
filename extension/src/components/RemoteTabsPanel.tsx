@@ -4,9 +4,10 @@ import { TabRow, EmptyState } from './MyTabsPanel';
 
 interface RemoteTabsPanelProps {
   devices: DeviceTabList[];
+  onRefresh?: () => void;
 }
 
-export function RemoteTabsPanel({ devices }: RemoteTabsPanelProps) {
+export function RemoteTabsPanel({ devices, onRefresh }: RemoteTabsPanelProps) {
   if (devices.length === 0) {
     return (
       <EmptyState
@@ -26,14 +27,109 @@ export function RemoteTabsPanel({ devices }: RemoteTabsPanelProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {devices.map(device => (
-        <DeviceAccordion key={device.deviceId} device={device} />
+        <DeviceAccordion key={device.deviceId} device={device} onRefresh={onRefresh} />
       ))}
     </div>
   );
 }
 
-function DeviceAccordion({ device }: { device: DeviceTabList }) {
+function DeviceAccordion({ device, onRefresh }: { device: DeviceTabList; onRefresh?: () => void }) {
   const [open, setOpen] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  if (device.decryptionFailed) {
+    const handlePruneClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setDeleteError(null);
+      setConfirmDelete(true);
+    };
+
+    const handleCancelDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setConfirmDelete(false);
+    };
+
+    const handleConfirmDelete = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!device.filePath) return;
+      setIsDeleting(true);
+      setDeleteError(null);
+      try {
+        const resp = await chrome.runtime.sendMessage({
+          type: 'DELETE_REMOTE_FILE',
+          payload: { filePath: device.filePath }
+        });
+        if (resp && resp.success) {
+          if (onRefresh) onRefresh();
+        } else {
+          setDeleteError(resp?.error || 'Unknown error');
+          setConfirmDelete(false);
+        }
+      } catch (err) {
+        setDeleteError(String(err));
+        setConfirmDelete(false);
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    return (
+      <div className="device-group" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+        <div className="device-header" onClick={() => setOpen(o => !o)} style={{ background: 'rgba(239, 68, 68, 0.04)' }}>
+          <div className="device-icon" style={{ background: 'var(--error-bg)' }}>
+            <span style={{ fontSize: '13px' }}>⚠️</span>
+          </div>
+          <div className="device-meta">
+            <div className="device-name" style={{ color: 'var(--error)', fontSize: '12px' }}>{device.deviceName}</div>
+            <div className="device-updated" style={{ color: 'var(--text-muted)' }}>
+              Decryption failed
+            </div>
+          </div>
+          {confirmDelete ? (
+            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px' }}
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '4px' }}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Removing...' : 'Confirm'}
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-danger"
+              style={{ fontSize: '10px', padding: '4px 8px', borderRadius: '4px', marginLeft: 'auto' }}
+              onClick={handlePruneClick}
+              disabled={isDeleting}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        {deleteError && (
+          <div style={{ padding: '6px 12px', color: 'var(--error)', fontSize: '11px', background: 'rgba(239,68,68,0.08)', borderTop: '1px dashed rgba(239,68,68,0.2)' }}>
+            Error: {deleteError}
+          </div>
+        )}
+        {open && (
+          <div className="device-body animate-in" style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4', padding: '10px 12px' }}>
+            This file was encrypted with a different key or salt (possibly before you set up manifest-based salt sharing). Click <strong>Remove</strong> and then <strong>Confirm</strong> to delete it from your WebDAV/Koofr storage and clear this error.
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const isDesktop = /Desktop|Windows|macOS|Linux|ChromeOS/.test(device.deviceName);
   const isMobile = /Android|iOS/.test(device.deviceName);

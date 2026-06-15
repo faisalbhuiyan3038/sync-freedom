@@ -27,6 +27,7 @@ export interface SyncStatus {
   lastSyncAt: number | null;
   lastSyncResult: 'success' | 'error' | 'idle';
   lastError: string | null;
+  lastWarning?: string | null;
   isSyncing: boolean;
   tabsPushed: number;
   remoteDeviceCount: number;
@@ -43,6 +44,7 @@ async function getStatus(): Promise<SyncStatus> {
     lastSyncAt: null,
     lastSyncResult: 'idle',
     lastError: null,
+    lastWarning: null,
     isSyncing: false,
     tabsPushed: 0,
     remoteDeviceCount: 0,
@@ -95,6 +97,31 @@ async function runSyncCycle(): Promise<void> {
     const key = await getEncryptionKey(passphrase, settings.encryptionSalt);
     const deviceInfo = await getDeviceInfo();
 
+    // Check if manifest.json exists, if not write it (for backward compatibility/migration)
+    const manifestPath = '/sync-freedom/manifest.json';
+    let needsManifest = false;
+    try {
+      await adapter.getFile(manifestPath);
+    } catch {
+      needsManifest = true;
+    }
+
+    if (needsManifest && settings.encryptionSalt) {
+      try {
+        console.log('[Sync] Manifest not found on backend. Uploading existing salt to manifest.json...');
+        const manifest = {
+          salt: settings.encryptionSalt,
+          version: 1,
+          createdAt: Date.now(),
+        };
+        const bytes = new TextEncoder().encode(JSON.stringify(manifest));
+        await adapter.putFile(manifestPath, bytes.buffer as ArrayBuffer);
+        console.log('[Sync] Salt manifest successfully uploaded.');
+      } catch (err) {
+        console.warn('[Sync] Failed to upload salt manifest (non-fatal):', err);
+      }
+    }
+
     // ── Tab sync ──
     const { pushed, tabCount } = await pushTabsIfChanged(
       adapter,
@@ -103,7 +130,7 @@ async function runSyncCycle(): Promise<void> {
       settings.tabSnapshotCount,
     );
 
-    const remoteTabs = await pullRemoteTabs(adapter, key, deviceInfo.deviceId);
+    const { devices: remoteTabs, errors: pullErrors } = await pullRemoteTabs(adapter, key, deviceInfo.deviceId);
 
     // ── History sync (Phase 2 — only if enabled) ──
     if (settings.historySyncEnabled) {
@@ -111,16 +138,23 @@ async function runSyncCycle(): Promise<void> {
       await pullAndMergeHistory(adapter, key, deviceInfo.deviceId);
     }
 
+    const warningMsg = pullErrors.length > 0
+      ? `Failed to decrypt data for ${pullErrors.length} device(s). Check passphrase compatibility.`
+      : null;
+
+    const decryptedTabs = remoteTabs.filter(d => !d.decryptionFailed);
+
     await setStatus({
       lastSyncAt: Date.now(),
       lastSyncResult: 'success',
       lastError: null,
+      lastWarning: warningMsg,
       isSyncing: false,
       tabsPushed: pushed ? tabCount : 0,
-      remoteDeviceCount: remoteTabs.length,
+      remoteDeviceCount: decryptedTabs.length,
     });
 
-    console.log(`[Sync] ✓ Complete — tabs pushed: ${pushed}, remote devices: ${remoteTabs.length}`);
+    console.log(`[Sync] ✓ Complete — tabs pushed: ${pushed}, remote devices: ${decryptedTabs.length}`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[Sync] ✗ Error:', message);
@@ -128,6 +162,7 @@ async function runSyncCycle(): Promise<void> {
       lastSyncAt: Date.now(),
       lastSyncResult: 'error',
       lastError: message,
+      lastWarning: null,
       isSyncing: false,
     });
   }
@@ -249,6 +284,24 @@ export default defineBackground(() => {
       registerSyncAlarm()
         .then(() => sendResponse({ success: true }))
         .catch(() => sendResponse({ success: false }));
+      return true;
+    }
+
+    if (msg.type === 'DELETE_REMOTE_FILE') {
+      const { filePath } = msg.payload as { filePath: string };
+      loadSettings().then(settings => {
+        if (settings.credentials) {
+          const adapter = createAdapter(settings.credentials);
+          adapter.deleteFile(filePath)
+            .then(() => runSyncCycle())
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err) }));
+        } else {
+          sendResponse({ success: false, error: 'No storage credentials found' });
+        }
+      }).catch(err => {
+        sendResponse({ success: false, error: String(err) });
+      });
       return true;
     }
   });

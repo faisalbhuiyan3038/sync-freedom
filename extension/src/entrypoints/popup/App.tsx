@@ -229,7 +229,7 @@ export default function App() {
       {/* Panels */}
       <div className="popup-panel animate-in" key={activeTab}>
         {activeTab === 'my-tabs' && <MyTabsPanel tabs={myTabs} />}
-        {activeTab === 'remote' && <RemoteTabsPanel devices={remoteTabs} />}
+        {activeTab === 'remote' && <RemoteTabsPanel devices={remoteTabs} onRefresh={loadTabData} />}
         {activeTab === 'history' && <TabHistoryPanel snapshots={snapshots} />}
         {activeTab === 'settings' && (
           <SettingsPanel settings={settings} onSaved={handleSettingsChange} />
@@ -268,10 +268,15 @@ function SyncStatusBar({ status, isSyncing }: { status: SyncStatus | null; isSyn
     dotClass = 'syncing';
     text = 'Syncing…';
   } else if (status?.lastSyncResult === 'success' && status.lastSyncAt) {
-    dotClass = 'success';
-    text = `Synced ${formatRelative(status.lastSyncAt)}`;
-    if (status.remoteDeviceCount > 0) {
-      text += ` · ${status.remoteDeviceCount} device${status.remoteDeviceCount !== 1 ? 's' : ''}`;
+    if (status.lastWarning) {
+      dotClass = 'warning';
+      text = status.lastWarning;
+    } else {
+      dotClass = 'success';
+      text = `Synced ${formatRelative(status.lastSyncAt)}`;
+      if (status.remoteDeviceCount > 0) {
+        text += ` · ${status.remoteDeviceCount} device${status.remoteDeviceCount !== 1 ? 's' : ''}`;
+      }
     }
   } else if (status?.lastSyncResult === 'error') {
     dotClass = 'error';
@@ -279,7 +284,7 @@ function SyncStatusBar({ status, isSyncing }: { status: SyncStatus | null; isSyn
   }
 
   return (
-    <div className="status-bar">
+    <div className="status-bar" title={text}>
       <span className={`status-dot${dotClass ? ' ' + dotClass : ''}`} />
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
     </div>

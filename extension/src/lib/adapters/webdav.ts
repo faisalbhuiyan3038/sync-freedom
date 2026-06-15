@@ -115,9 +115,6 @@ export class WebDAVAdapter implements StorageAdapter {
     });
   }
 
-  /**
-   * Parse WebDAV PROPFIND XML response and extract file hrefs (non-collection).
-   */
   private parseHrefs(xml: string, prefix: string): string[] {
     const hrefs: string[] = [];
     // Match <d:href>...</d:href> elements
@@ -126,16 +123,37 @@ export class WebDAVAdapter implements StorageAdapter {
 
     // Decode base URL path to compare
     const baseUrlPath = new URL(this.baseUrl).pathname;
+    const normBase = baseUrlPath.replace(/\/$/, '');
 
     while ((match = hrefRegex.exec(xml)) !== null) {
       let href = decodeURIComponent(match[1].trim());
-      // Convert absolute path to relative (strip server base path)
-      if (href.startsWith(baseUrlPath)) {
-        href = href.slice(baseUrlPath.length);
+
+      // If absolute URL, extract pathname
+      if (href.toLowerCase().startsWith('http://') || href.toLowerCase().startsWith('https://')) {
+        try {
+          href = new URL(href).pathname;
+        } catch {}
       }
-      // Skip the directory itself and directories
+
+      // Ensure leading slash initially so startsWith(normBase) matches
+      if (!href.startsWith('/')) {
+        href = '/' + href;
+      }
+
+      // Convert absolute path to relative (strip server base path)
+      if (normBase && href.startsWith(normBase)) {
+        href = href.slice(normBase.length);
+      }
+
+      // Ensure leading slash for the relative path
+      if (!href.startsWith('/')) {
+        href = '/' + href;
+      }
+
+      // Skip directories and ensure it matches the prefix directory exactly
+      const dirPrefix = prefix.endsWith('/') ? prefix : prefix + '/';
       const isDir = href.endsWith('/');
-      if (!isDir && href.includes(prefix.replace(/\/$/, ''))) {
+      if (!isDir && href.startsWith(dirPrefix)) {
         hrefs.push(href);
       }
     }

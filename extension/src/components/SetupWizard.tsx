@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { SyncSettings, AdapterCredentials } from '../lib/adapters/interface';
-import { saveSettings } from '../lib/adapters/factory';
+import { saveSettings, createAdapter } from '../lib/adapters/factory';
 import { deriveKey } from '../lib/crypto';
 
 interface SetupWizardProps {
@@ -76,8 +76,40 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
     try {
       const creds = buildCredentials();
-      // Generate and store salt
-      const { salt } = await deriveKey(passphrase);
+      const adapter = createAdapter(creds);
+      let salt: string;
+      const manifestPath = '/sync-freedom/manifest.json';
+
+      try {
+        console.log('[Setup] Checking for existing salt manifest on storage backend...');
+        const raw = await adapter.getFile(manifestPath);
+        const text = new TextDecoder().decode(raw);
+        const manifest = JSON.parse(text) as { salt: string };
+        if (manifest.salt) {
+          salt = manifest.salt;
+          console.log('[Setup] Found existing salt in manifest.json:', salt);
+        } else {
+          throw new Error('Manifest missing salt field');
+        }
+      } catch (err) {
+        console.log('[Setup] No existing salt manifest found (or invalid), generating a new salt.');
+        // Generate new salt
+        const keyBundle = await deriveKey(passphrase);
+        salt = keyBundle.salt;
+
+        // Write manifest to storage backend
+        const manifest = {
+          salt,
+          version: 1,
+          createdAt: Date.now(),
+        };
+        const bytes = new TextEncoder().encode(JSON.stringify(manifest));
+        await adapter.putFile(manifestPath, bytes.buffer as ArrayBuffer);
+        console.log('[Setup] Saved new salt manifest to storage backend.');
+      }
+
+      // Validate key derivation with this salt
+      await deriveKey(passphrase, salt);
 
       const newSettings: SyncSettings = {
         credentials: creds,
