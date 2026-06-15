@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Sync Freedom — API Probe",
+  "version": "1.0.0",
+  "description": "Tests Chrome extension API compatibility for mobile browsers. Probes tabs, history, alarms, storage, crypto, IndexedDB, fetch, and more.",
+  "permissions": [
+    "tabs",
+    "history",
+    "alarms",
+    "storage",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "API Probe Results"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
