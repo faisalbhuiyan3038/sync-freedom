@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "WebWorker"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "wxt.config.ts", ".wxt/types"]
+}

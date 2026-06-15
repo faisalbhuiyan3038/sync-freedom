@@ -1,0 +1,25 @@
+{
+  "name": "sync-freedom",
+  "version": "0.1.0",
+  "description": "Cross-device browser history and tab sync using your own storage backend.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare",
+    "compile": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "wxt": "^0.20.26",
+    "@wxt-dev/module-react": "^1.1.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

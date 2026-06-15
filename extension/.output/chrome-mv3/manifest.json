@@ -1,0 +1,1 @@
+{"manifest_version":3,"name":"Sync Freedom","description":"Cross-device browser history and tab sync using your own storage backend.","version":"0.1.0","permissions":["tabs","history","alarms","storage","activeTab"],"host_permissions":["*://*/*"],"action":{"default_title":"Sync Freedom","default_popup":"popup.html"},"background":{"service_worker":"background.js"}}
